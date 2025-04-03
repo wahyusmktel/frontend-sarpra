@@ -12,6 +12,21 @@ const model = ref([
         items: [{ label: 'Manajemen Aset', icon: 'pi pi-fw pi-box', to: '/assets' }]
     },
     {
+        items: [{ label: 'Kategori Aset', icon: 'pi pi-fw pi-tags', to: '/asset-categories' }]
+    },
+    {
+        items: [{ label: 'Type Aset', icon: 'pi pi-fw pi-tags', to: '/asset-types' }]
+    },
+    {
+        items: [{ label: 'Kondisi Aset', icon: 'pi pi-fw pi-tags', to: '/asset-conditions' }]
+    },
+    {
+        items: [{ label: 'Lokasi Aset', icon: 'pi pi-fw pi-tags', to: '/asset-locations' }]
+    },
+    {
+        items: [{ label: 'Dokumen Aset', icon: 'pi pi-fw pi-tags', to: '/assets/documents' }]
+    },
+    {
         label: 'UI Components',
         items: [
             { label: 'Form Layout', icon: 'pi pi-fw pi-id-card', to: '/uikit/formlayout' },

@@ -39,6 +39,31 @@ const router = createRouter({
                     meta: { requiresAuth: true }
                 },
                 {
+                    path: '/asset-categories',
+                    name: 'asset-categories',
+                    component: () => import('@/views/AssetCategoryList.vue')
+                },
+                {
+                    path: '/asset-types',
+                    name: 'asset-types',
+                    component: () => import('@/views/asset/AssetTypeList.vue')
+                },
+                {
+                    path: '/asset-conditions',
+                    name: 'asset-conditions',
+                    component: () => import('@/views/pages/assets/AssetConditionList.vue')
+                },
+                {
+                    path: '/asset-locations',
+                    name: 'lokasi-aset',
+                    component: () => import('@/views/pages/assets/AssetLocationList.vue')
+                },
+                {
+                    path: '/assets/documents',
+                    name: 'assets/documents',
+                    component: () => import('@/views/pages/assets/AssetDocument.vue')
+                },
+                {
                     path: '/uikit/input',
                     name: 'input',
                     component: () => import('@/views/uikit/InputDoc.vue')

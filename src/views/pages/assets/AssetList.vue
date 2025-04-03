@@ -1,6 +1,7 @@
 <script setup>
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
+import dayjs from 'dayjs/esm/index.js';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
 
@@ -20,6 +21,8 @@ const conditions = ref([]);
 const locations = ref([]);
 const types = ref([]);
 const users = ref([]);
+const detailDialog = ref(false);
+const selectedAssetDetail = ref(null);
 
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
@@ -120,6 +123,10 @@ function confirmDeleteSelected() {
     deleteAssetsDialog.value = true;
 }
 
+function formatDate(date) {
+    return date ? dayjs(date).format('D MMMM YYYY') : '-';
+}
+
 async function saveAsset() {
     submitted.value = true;
     if (!asset.value.name) return;
@@ -161,6 +168,11 @@ async function deleteAsset() {
 function editAsset(data) {
     asset.value = { ...data };
     assetDialog.value = true;
+}
+
+function viewAssetDetail(data) {
+    selectedAssetDetail.value = data;
+    detailDialog.value = true;
 }
 
 function exportCSV() {
@@ -212,9 +224,14 @@ function exportCSV() {
                 <Column field="category.name" header="Kategori" />
                 <Column field="condition.name" header="Kondisi" />
                 <Column field="location.name" header="Lokasi" />
-                <Column field="acquisition_date" header="Tgl. Perolehan" />
+                <Column header="Tgl. Perolehan">
+                    <template #body="slotProps">
+                        {{ formatDate(slotProps.data.acquisition_date) }}
+                    </template>
+                </Column>
                 <Column :exportable="false">
                     <template #body="slotProps">
+                        <Button icon="pi pi-search" rounded outlined class="mr-2" @click="viewAssetDetail(slotProps.data)" />
                         <Button icon="pi pi-pencil" rounded outlined class="mr-2" @click="editAsset(slotProps.data)" />
                         <Button icon="pi pi-trash" rounded outlined severity="danger" @click="confirmDeleteAsset(slotProps.data)" />
                     </template>
@@ -298,6 +315,61 @@ function exportCSV() {
             <template #footer>
                 <Button label="Tidak" icon="pi pi-times" text @click="deleteAssetDialog = false" />
                 <Button label="Ya" icon="pi pi-check" severity="danger" @click="deleteAsset" />
+            </template>
+        </Dialog>
+        <Dialog v-model:visible="detailDialog" header="Detail Aset" :style="{ width: '800px' }" modal>
+            <div v-if="selectedAssetDetail" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block font-bold mb-2">Nama Aset</label>
+                    <InputText v-model="selectedAssetDetail.name" readonly class="w-full" />
+                </div>
+                <div>
+                    <label class="block font-bold mb-2">Serial Number</label>
+                    <InputText v-model="selectedAssetDetail.serial_number" readonly class="w-full" />
+                </div>
+                <div>
+                    <label class="block font-bold mb-2">Kode Aset</label>
+                    <InputText v-model="selectedAssetDetail.asset_code" readonly class="w-full" />
+                </div>
+                <div>
+                    <label class="block font-bold mb-2">Kategori</label>
+                    <InputText :modelValue="selectedAssetDetail.category?.name" readonly class="w-full" />
+                </div>
+                <div>
+                    <label class="block font-bold mb-2">Jenis</label>
+                    <InputText :modelValue="selectedAssetDetail.type?.name" readonly class="w-full" />
+                </div>
+                <div>
+                    <label class="block font-bold mb-2">Lokasi</label>
+                    <InputText :modelValue="selectedAssetDetail.location?.name" readonly class="w-full" />
+                </div>
+                <div>
+                    <label class="block font-bold mb-2">Kondisi</label>
+                    <InputText :modelValue="selectedAssetDetail.condition?.name" readonly class="w-full" />
+                </div>
+                <div>
+                    <label class="block font-bold mb-2">Sumber Dana</label>
+                    <InputText v-model="selectedAssetDetail.funding_source" readonly class="w-full" />
+                </div>
+                <div>
+                    <label class="block font-bold mb-2">Biaya Perolehan</label>
+                    <InputText :modelValue="`Rp ${selectedAssetDetail.acquisition_cost?.toLocaleString('id-ID')}`" readonly class="w-full" />
+                </div>
+                <div>
+                    <label class="block font-bold mb-2">Tanggal Perolehan</label>
+                    <InputText :modelValue="selectedAssetDetail.acquisition_date" readonly class="w-full" />
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block font-bold mb-2">Penanggung Jawab</label>
+                    <InputText :modelValue="selectedAssetDetail.responsible?.username" readonly class="w-full" />
+                </div>
+                <div class="md:col-span-2 text-center mt-4" v-if="selectedAssetDetail.qr_code_path">
+                    <label class="block font-bold mb-2">QR Code</label>
+                    <img :src="`http://localhost:8000/${selectedAssetDetail.qr_code_path}`" alt="QR Code" class="inline-block w-32 rounded border" />
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Tutup" icon="pi pi-times" text @click="detailDialog = false" />
             </template>
         </Dialog>
     </div>
