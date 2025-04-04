@@ -27,6 +27,12 @@ const model = ref([
         items: [{ label: 'Dokumen Aset', icon: 'pi pi-fw pi-tags', to: '/assets/documents' }]
     },
     {
+        items: [{ label: 'Scanner QR Aset', icon: 'pi pi-fw pi-qrcode', to: '/assets/scanner' }]
+    },
+    {
+        items: [{ label: 'Peminjaman Aset', icon: 'pi pi-fw pi-qrcode', to: '/assets/asset-loans' }]
+    },
+    {
         label: 'UI Components',
         items: [
             { label: 'Form Layout', icon: 'pi pi-fw pi-id-card', to: '/uikit/formlayout' },

@@ -64,6 +64,16 @@ const router = createRouter({
                     component: () => import('@/views/pages/assets/AssetDocument.vue')
                 },
                 {
+                    path: '/assets/scanner',
+                    name: 'assets/scanner',
+                    component: () => import('@/views/pages/assets/AssetQrScanner.vue')
+                },
+                {
+                    path: '/assets/asset-loans',
+                    name: 'assets/asset-loans',
+                    component: () => import('@/views/pages/assets/AssetLoan.vue')
+                },
+                {
                     path: '/uikit/input',
                     name: 'input',
                     component: () => import('@/views/uikit/InputDoc.vue')
