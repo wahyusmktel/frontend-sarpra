@@ -1,3 +1,62 @@
+<script setup>
+import axios from 'axios';
+import { useToast } from 'primevue/usetoast';
+import { nextTick, ref } from 'vue';
+import { QrcodeStream } from 'vue-qrcode-reader';
+
+const toast = useToast();
+const token = localStorage.getItem('token');
+
+const result = ref('');
+const error = ref('');
+const detailVisible = ref(false);
+const assetDetail = ref(null);
+
+function onCameraReady() {
+    console.log('Kamera aktif, siap scan!');
+}
+
+function onError(err) {
+    console.error('QR Error:', err);
+    toast.add({ severity: 'error', summary: 'QR Gagal', detail: err.message });
+}
+
+function paintBoundingBox(detectedCodes, ctx) {
+    for (const { boundingBox } of detectedCodes) {
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(boundingBox.x, boundingBox.y, boundingBox.width, boundingBox.height);
+    }
+}
+
+async function onDetect([data]) {
+    const url = data.rawValue;
+
+    if (result.value === url) return; // Cegah trigger ulang
+
+    result.value = url;
+
+    try {
+        const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+
+        console.log('API Result:', res.data);
+
+        assetDetail.value = res.data;
+
+        detailVisible.value = false;
+        await nextTick();
+        detailVisible.value = true;
+    } catch (err) {
+        toast.add({ severity: 'error', summary: 'Gagal', detail: 'Tidak bisa ambil detail aset' });
+        console.error(err);
+    }
+
+    setTimeout(() => {
+        result.value = '';
+    }, 2000); // Setelah 2 detik boleh scan ulang QR yang sama
+}
+</script>
+
 <template>
     <div class="card">
         <h4 class="mb-4">Scan QR Code Aset</h4>
@@ -57,67 +116,6 @@
         </Dialog>
     </div>
 </template>
-
-<script setup>
-import axios from 'axios';
-import { useToast } from 'primevue/usetoast';
-import { nextTick, ref } from 'vue';
-import { QrcodeStream } from 'vue-qrcode-reader';
-
-const toast = useToast();
-const token = localStorage.getItem('token');
-
-const result = ref('');
-const error = ref('');
-const detailVisible = ref(false);
-const assetDetail = ref(null);
-
-function onCameraReady() {
-    console.log('Kamera aktif, siap scan!');
-}
-
-function onError(err) {
-    console.error('QR Error:', err);
-    toast.add({ severity: 'error', summary: 'QR Gagal', detail: err.message });
-}
-
-function paintBoundingBox(detectedCodes, ctx) {
-    for (const { boundingBox } of detectedCodes) {
-        ctx.strokeStyle = 'red';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(boundingBox.x, boundingBox.y, boundingBox.width, boundingBox.height);
-    }
-}
-
-async function onDetect([data]) {
-    const url = data.rawValue;
-
-    if (result.value === url) return; // Cegah trigger ulang
-
-    result.value = url;
-
-    try {
-        const res = await axios.get(url, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-
-        console.log('API Result:', res.data);
-
-        assetDetail.value = res.data;
-
-        detailVisible.value = false;
-        await nextTick();
-        detailVisible.value = true;
-    } catch (err) {
-        toast.add({ severity: 'error', summary: 'Gagal', detail: 'Tidak bisa ambil detail aset' });
-        console.error(err);
-    }
-
-    setTimeout(() => {
-        result.value = '';
-    }, 2000); // Setelah 2 detik boleh scan ulang QR yang sama
-}
-</script>
 
 <style scoped>
 .qrcode-stream {

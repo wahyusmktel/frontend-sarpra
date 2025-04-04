@@ -3,6 +3,7 @@ import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
+import { QrcodeStream } from 'vue-qrcode-reader';
 
 const toast = useToast();
 const API_URL = 'http://localhost:8000/api';
@@ -19,11 +20,11 @@ const loanToDelete = ref(null);
 const selectedLoans = ref([]);
 const submitted = ref(false);
 const loading = ref(true);
+const selectedAsset = ref(null);
+const filteredAssets = ref([]);
+const scanVisible = ref(false); // Modal scan QR
 
-const filters = ref({
-    global: { value: null, matchMode: FilterMatchMode.CONTAINS },
-    status: { value: null, matchMode: FilterMatchMode.EQUALS }
-});
+const filters = ref({ global: { value: null, matchMode: FilterMatchMode.CONTAINS }, status: { value: null, matchMode: FilterMatchMode.EQUALS } });
 
 const statuses = ['Dipinjam', 'Dikembalikan', 'Terlambat'];
 
@@ -48,6 +49,49 @@ async function fetchData() {
     } finally {
         loading.value = false;
     }
+}
+
+// dari hasil QR code scanner
+async function handleScannedResult(url) {
+    try {
+        const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+        selectedAsset.value = res.data;
+        loan.value.asset_id = res.data.id;
+        scanVisible.value = false;
+    } catch (error) {
+        toast.add({ severity: 'error', summary: 'Gagal', detail: 'QR tidak valid' });
+    }
+}
+
+function printDocument(loan) {
+    if (!loan.document_path) {
+        toast.add({ severity: 'warn', summary: 'Tidak Ada Dokumen', detail: 'Dokumen belum tersedia' });
+        return;
+    }
+
+    const url = `${window.location.origin}/${loan.document_path}`;
+    window.open(url, '_blank');
+}
+
+function onDetectQR([result]) {
+    const url = result.rawValue;
+    if (url) {
+        handleScannedResult(url); // fungsi ini sudah kamu buat
+    }
+}
+
+function onScanError() {
+    toast.add({ severity: 'error', summary: 'Gagal', detail: 'Tidak bisa membaca QR code' });
+}
+
+function searchAsset(event) {
+    const query = event.query.toLowerCase();
+    filteredAssets.value = assets.value.filter((a) => a.name.toLowerCase().includes(query));
+}
+
+function selectAsset(e) {
+    loan.value.asset_id = e.value.id;
+    selectedAsset.value = e.value;
 }
 
 function openNew() {
@@ -89,7 +133,7 @@ function getStatusSeverity(status) {
     }
 }
 
-async function saveLoan() {
+async function saveLoanWithAsset() {
     submitted.value = true;
     if (!loan.value.asset_id || !loan.value.borrower_user_id || !loan.value.loan_start || !loan.value.loan_end || !loan.value.status) {
         toast.add({ severity: 'warn', summary: 'Validasi', detail: 'Harap lengkapi semua field yang wajib' });
@@ -98,14 +142,10 @@ async function saveLoan() {
 
     try {
         if (loan.value.id) {
-            await axios.put(`${API_URL}/asset-loans/${loan.value.id}`, loan.value, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.put(`${API_URL}/asset-loans/${loan.value.id}`, loan.value, { headers: { Authorization: `Bearer ${token}` } });
             toast.add({ severity: 'success', summary: 'Sukses', detail: 'Peminjaman diperbarui' });
         } else {
-            await axios.post(`${API_URL}/asset-loans`, loan.value, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.post(`${API_URL}/asset-loans`, loan.value, { headers: { Authorization: `Bearer ${token}` } });
             toast.add({ severity: 'success', summary: 'Sukses', detail: 'Peminjaman ditambahkan' });
         }
 
@@ -120,9 +160,7 @@ async function saveLoan() {
 async function deleteLoan() {
     if (!loanToDelete.value) return;
     try {
-        await axios.delete(`${API_URL}/asset-loans/${loanToDelete.value.id}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        await axios.delete(`${API_URL}/asset-loans/${loanToDelete.value.id}`, { headers: { Authorization: `Bearer ${token}` } });
         toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Peminjaman dihapus' });
         await fetchData();
     } catch (error) {
@@ -137,13 +175,7 @@ async function deleteSelectedLoans() {
     try {
         const ids = selectedLoans.value.map((loan) => loan.id);
 
-        await Promise.all(
-            ids.map((id) =>
-                axios.delete(`${API_URL}/asset-loans/${id}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
-            )
-        );
+        await Promise.all(ids.map((id) => axios.delete(`${API_URL}/asset-loans/${id}`, { headers: { Authorization: `Bearer ${token}` } })));
 
         toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Peminjaman terpilih dihapus' });
         selectedLoans.value = [];
@@ -219,30 +251,69 @@ function exportCSV() {
                         <Tag :value="slotProps.data.status" :severity="getStatusSeverity(slotProps.data.status)" />
                     </template>
                 </Column>
+                <Column header="Dokumen">
+                    <template #body="slotProps">
+                        <a v-if="slotProps.data.document_path" :href="slotProps.data.document_path" target="_blank">
+                            {{ slotProps.data.document_name }}
+                        </a>
+                        <span v-else class="text-gray-400 italic">Belum tersedia</span>
+                    </template>
+                </Column>
                 <Column :exportable="false">
                     <template #body="slotProps">
                         <Button icon="pi pi-pencil" rounded outlined class="mr-2" @click="editLoan(slotProps.data)" />
                         <Button icon="pi pi-trash" rounded outlined severity="danger" @click="confirmDeleteLoan(slotProps.data)" />
+                        <Button v-if="slotProps.data.document_name" icon="pi pi-print" rounded outlined severity="success" @click="printDocument(slotProps.data)" v-tooltip="'Cetak Surat Peminjaman'" />
                     </template>
                 </Column>
             </DataTable>
 
-            <Dialog v-model:visible="loanDialog" :style="{ width: '450px' }" header="Form Peminjaman Aset" :modal="true">
-                <div class="flex flex-col gap-4">
-                    <Dropdown v-model="loan.asset_id" :options="assets" optionLabel="name" optionValue="id" placeholder="Pilih Aset" class="w-full" />
-                    <Dropdown v-model="loan.borrower_user_id" :options="users" optionLabel="username" optionValue="id" placeholder="Pilih Peminjam" class="w-full" />
-                    <Textarea v-model="loan.purpose" placeholder="Keperluan" class="w-full" rows="3" />
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Calendar v-model="loan.loan_start" placeholder="Tanggal Pinjam" class="w-full" />
-                        <Calendar v-model="loan.loan_end" placeholder="Tanggal Kembali" class="w-full" />
+            <Dialog v-model:visible="loanDialog" :style="{ width: '90vw' }" header="Form Peminjaman Aset" :modal="true">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Kolom Kiri -->
+                    <div class="flex flex-col gap-4">
+                        <label class="font-bold">Cari Aset</label>
+                        <AutoComplete v-model="selectedAsset" :suggestions="filteredAssets" field="name" optionLabel="name" placeholder="Ketik nama aset..." class="w-full" @complete="searchAsset" @item-select="selectAsset">
+                            <template #item="slotProps">
+                                <div class="flex flex-col">
+                                    <span class="font-semibold">{{ slotProps.item.name }}</span>
+                                    <small class="text-gray-500">Serial: {{ slotProps.item.serial_number }}</small>
+                                </div>
+                            </template>
+                        </AutoComplete>
+
+                        <div v-if="selectedAsset">
+                            <div class="p-4 border rounded bg-gray-50">
+                                <p class="mb-1"><i class="pi pi-tag mr-2" /> <strong>Nama:</strong> {{ selectedAsset.name }}</p>
+                                <p class="mb-1"><i class="pi pi-hashtag mr-2" /> <strong>Serial:</strong> {{ selectedAsset.serial_number }}</p>
+                                <p class="mb-1"><i class="pi pi-list mr-2" /> <strong>Kategori:</strong> {{ selectedAsset.category?.name }}</p>
+                                <p class="mb-1"><i class="pi pi-check-circle mr-2" /> <strong>Kondisi:</strong> {{ selectedAsset.condition?.name }}</p>
+                                <p class="mb-1"><i class="pi pi-map-marker mr-2" /> <strong>Lokasi:</strong> {{ selectedAsset.location?.name }}</p>
+                                <img v-if="selectedAsset.qr_code_path" :src="`${API_URL.replace('/api', '')}/${selectedAsset.qr_code_path}`" alt="QR Code" class="mt-4 w-40 h-40 object-contain border" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <Button label="Atau Scan QR Code" icon="pi pi-qrcode" class="mt-2" @click="scanVisible = true" />
+                        </div>
                     </div>
-                    <Dropdown v-model="loan.status" :options="statuses" placeholder="Status" class="w-full" />
-                    <Textarea v-model="loan.notes" placeholder="Catatan" class="w-full" rows="3" />
+
+                    <!-- Kolom Kanan -->
+                    <div class="flex flex-col gap-4">
+                        <Dropdown v-model="loan.borrower_user_id" :options="users" optionLabel="username" optionValue="id" placeholder="Pilih Peminjam" class="w-full" />
+                        <Textarea v-model="loan.purpose" placeholder="Keperluan" class="w-full" rows="3" />
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Calendar v-model="loan.loan_start" placeholder="Tanggal Pinjam" class="w-full" />
+                            <Calendar v-model="loan.loan_end" placeholder="Tanggal Kembali" class="w-full" />
+                        </div>
+                        <Dropdown v-model="loan.status" :options="statuses" placeholder="Status" class="w-full" />
+                        <Textarea v-model="loan.notes" placeholder="Catatan" class="w-full" rows="3" />
+                    </div>
                 </div>
 
                 <template #footer>
                     <Button label="Batal" icon="pi pi-times" text @click="hideDialog" />
-                    <Button label="Simpan" icon="pi pi-check" @click="saveLoan" />
+                    <Button label="Simpan" icon="pi pi-check" @click="saveLoanWithAsset" />
                 </template>
             </Dialog>
 
@@ -269,6 +340,13 @@ function exportCSV() {
                 <template #footer>
                     <Button label="Batal" icon="pi pi-times" text @click="deleteLoansDialog.value = false" />
                     <Button label="Ya, Hapus" icon="pi pi-check" severity="danger" @click="deleteSelectedLoans" />
+                </template>
+            </Dialog>
+            <!-- Modal QR Code Scanner -->
+            <Dialog v-model:visible="scanVisible" header="Scan QR Code Aset" :style="{ width: '600px' }" :modal="true">
+                <QrcodeStream @detect="onDetectQR" @error="onScanError" />
+                <template #footer>
+                    <Button label="Tutup" icon="pi pi-times" text @click="scanVisible = false" />
                 </template>
             </Dialog>
         </template>
