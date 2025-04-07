@@ -2,7 +2,7 @@
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { QrcodeStream } from 'vue-qrcode-reader';
 
 const toast = useToast();
@@ -23,6 +23,7 @@ const loading = ref(true);
 const selectedAsset = ref(null);
 const filteredAssets = ref([]);
 const scanVisible = ref(false); // Modal scan QR
+const loanDuration = ref(null);
 
 const filters = ref({ global: { value: null, matchMode: FilterMatchMode.CONTAINS }, status: { value: null, matchMode: FilterMatchMode.EQUALS } });
 
@@ -30,6 +31,14 @@ const statuses = ['Dipinjam', 'Dikembalikan', 'Terlambat'];
 
 onMounted(async () => {
     await fetchData();
+});
+
+watch([() => loan.value.loan_start, loanDuration], ([start, days]) => {
+    if (start && days) {
+        const newDate = new Date(start);
+        newDate.setDate(newDate.getDate() + parseInt(days));
+        loan.value.loan_end = newDate.toISOString().substring(0, 10); // ISO format
+    }
 });
 
 async function fetchData() {
@@ -69,7 +78,8 @@ function printDocument(loan) {
         return;
     }
 
-    const url = `${window.location.origin}/${loan.document_path}`;
+    // const url = `${window.location.origin}/${loan.document_path}`;
+    const url = `${API_URL.replace('/api', '')}/${loan.document_path}`;
     window.open(url, '_blank');
 }
 
@@ -96,18 +106,26 @@ function selectAsset(e) {
 
 function openNew() {
     loan.value = {};
+    selectedAsset.value = null;
     submitted.value = false;
     loanDialog.value = true;
+    loanDuration.value = null;
 }
 
 function hideDialog() {
     loanDialog.value = false;
     submitted.value = false;
     loan.value = {};
+    selectedAsset.value = null;
 }
 
 function editLoan(data) {
-    loan.value = { ...data };
+    loan.value = {
+        ...data,
+        loan_start: data.loan_start ? new Date(data.loan_start) : null,
+        loan_end: data.loan_end ? new Date(data.loan_end) : null
+    };
+    selectedAsset.value = assets.value.find((asset) => asset.id === data.asset_id) || null; // Cari aset yang sesuai dengan asset_id
     loanDialog.value = true;
 }
 
@@ -141,11 +159,21 @@ async function saveLoanWithAsset() {
     }
 
     try {
+        let response;
         if (loan.value.id) {
-            await axios.put(`${API_URL}/asset-loans/${loan.value.id}`, loan.value, { headers: { Authorization: `Bearer ${token}` } });
-            toast.add({ severity: 'success', summary: 'Sukses', detail: 'Peminjaman diperbarui' });
+            // Kirim permintaan PUT untuk memperbarui data
+            response = await axios.put(`${API_URL}/asset-loans/${loan.value.id}`, loan.value, { headers: { Authorization: `Bearer ${token}` } });
         } else {
-            await axios.post(`${API_URL}/asset-loans`, loan.value, { headers: { Authorization: `Bearer ${token}` } });
+            // Kirim permintaan POST untuk menambahkan data baru
+            response = await axios.post(`${API_URL}/asset-loans`, loan.value, { headers: { Authorization: `Bearer ${token}` } });
+        }
+
+        // Periksa respons dari backend
+        if (response.data.message === 'Tidak ada perubahan data') {
+            toast.add({ severity: 'info', summary: 'Info', detail: 'Tidak ada perubahan data' });
+        } else if (response.data.message === 'Peminjaman diperbarui') {
+            toast.add({ severity: 'success', summary: 'Sukses', detail: 'Peminjaman diperbarui' });
+        } else if (response.data.message === 'Peminjaman ditambahkan') {
             toast.add({ severity: 'success', summary: 'Sukses', detail: 'Peminjaman ditambahkan' });
         }
 
@@ -253,7 +281,7 @@ function exportCSV() {
                 </Column>
                 <Column header="Dokumen">
                     <template #body="slotProps">
-                        <a v-if="slotProps.data.document_path" :href="slotProps.data.document_path" target="_blank">
+                        <a v-if="slotProps.data.document_path" :href="`${API_URL.replace('/api', '')}/${slotProps.data.document_path}`" target="_blank">
                             {{ slotProps.data.document_name }}
                         </a>
                         <span v-else class="text-gray-400 italic">Belum tersedia</span>
@@ -302,9 +330,10 @@ function exportCSV() {
                     <div class="flex flex-col gap-4">
                         <Dropdown v-model="loan.borrower_user_id" :options="users" optionLabel="username" optionValue="id" placeholder="Pilih Peminjam" class="w-full" />
                         <Textarea v-model="loan.purpose" placeholder="Keperluan" class="w-full" rows="3" />
+                        <InputNumber v-model="loanDuration" placeholder="Lama Peminjaman (hari)" class="w-full" :min="1" />
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Calendar v-model="loan.loan_start" placeholder="Tanggal Pinjam" class="w-full" />
-                            <Calendar v-model="loan.loan_end" placeholder="Tanggal Kembali" class="w-full" />
+                            <Calendar v-model="loan.loan_end" placeholder="Tanggal Kembali" class="w-full" :readonlyInput="true" :disabled="true" />
                         </div>
                         <Dropdown v-model="loan.status" :options="statuses" placeholder="Status" class="w-full" />
                         <Textarea v-model="loan.notes" placeholder="Catatan" class="w-full" rows="3" />

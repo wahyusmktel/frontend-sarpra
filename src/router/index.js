@@ -74,9 +74,9 @@ const router = createRouter({
                     component: () => import('@/views/pages/assets/AssetLoan.vue')
                 },
                 {
-                    path: '/uikit/input',
-                    name: 'input',
-                    component: () => import('@/views/uikit/InputDoc.vue')
+                    path: '/assets/asset-usages',
+                    name: 'assets/asset-usages',
+                    component: () => import('@/views/pages/assets/AssetUsage.vue')
                 },
                 {
                     path: '/uikit/button',

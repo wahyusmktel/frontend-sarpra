@@ -33,6 +33,9 @@ const model = ref([
         items: [{ label: 'Peminjaman Aset', icon: 'pi pi-fw pi-qrcode', to: '/assets/asset-loans' }]
     },
     {
+        items: [{ label: 'Penggunaan Aset', icon: 'pi pi-fw pi-qrcode', to: '/assets/asset-usages' }]
+    },
+    {
         label: 'UI Components',
         items: [
             { label: 'Form Layout', icon: 'pi pi-fw pi-id-card', to: '/uikit/formlayout' },
