@@ -79,6 +79,11 @@ const router = createRouter({
                     component: () => import('@/views/pages/assets/AssetUsage.vue')
                 },
                 {
+                    path: '/assets/asset-maintenances',
+                    name: 'assets/asset-maintenances',
+                    component: () => import('@/views/pages/assets/AssetMaintenance.vue')
+                },
+                {
                     path: '/uikit/button',
                     name: 'button',
                     component: () => import('@/views/uikit/ButtonDoc.vue')
